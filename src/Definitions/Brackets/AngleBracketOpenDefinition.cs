@@ -71,8 +71,8 @@
                 InputType = InputType.Function
             }).Result;
 
-            if (response.Value.Contains("${"))
-                return (Expression.Constant(response.Value), new InnerDep(null, response));
+            if (response.Values[0].Contains("${"))
+                return (Expression.Constant(response.Values[0]), new InnerDep(null, response));
 
             var insideBrackets = StringSegment.Between(bracketOpen.StringSegment, bracketClose.StringSegment);
             throw new OperandExpectedException(insideBrackets);

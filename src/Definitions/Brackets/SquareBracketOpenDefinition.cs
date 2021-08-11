@@ -68,10 +68,21 @@
                 InputType = InputType.Resolver
             }).Result;
 
-            var aqlFormula = _language.Parse(response.Value);
-            var innerExpressionResult = Expression.Constant(aqlFormula.Result);
+            if (response.Values.Count == 1 && !response.AllowsMultipleValues)
+            {
+                var aqlFormula = _language.Parse(response.Values[0]);
+                var innerExpressionResult = Expression.Constant(aqlFormula.Result);
 
-            return (innerExpressionResult, new InnerDep(aqlFormula, response));
+                return (innerExpressionResult, new InnerDep(aqlFormula, response));
+            }
+
+            var listValues = response.Values
+                .Select(value => _language.Parse(value))
+                .Select(aqlFormula => aqlFormula.Result)
+                .ToList();
+
+            var innerListResult = Expression.Constant(listValues);
+            return (innerListResult, null);
         }
     }
 }

@@ -6,39 +6,13 @@
     using System.Linq.Expressions;
     using Definitions;
     using Definitions.Brackets;
+    using Enumerators;
     using Injections;
     using Structs;
     using Utility;
 
-    public class InnerDep
+    public sealed class AlbedoQueryLanguage
     {
-        public InnerDep(AqlFormula aqlFormula, ResolverResponse response)
-        {
-            Formula = aqlFormula;
-            Resolver = response;
-        }
-
-        public AqlFormula Formula { get; set; }
-        public ResolverResponse Resolver { get; set; }
-    }
-
-    public class AqlFormula
-    {
-        public AqlFormula()
-        {
-            InnerOps = new List<Operand>();
-        }
-
-        public string ExpressionText { get; set; }
-        public string Raw { get; set; }
-        public decimal Result { get; set; }
-
-        public List<Operand> InnerOps { get; set; }
-    }
-
-    public class AlbedoQueryLanguage
-    {
-        private readonly List<AqlFormula> _instanceFormulas = new List<AqlFormula>();
         private readonly BaseQueryLanguage _language;
         public readonly IAqlResolver Resolver;
 
@@ -70,54 +44,7 @@
             return frml;
         }
 
-        private static string GetRawDisplay(Operand op)
-        {
-            if (op.Expression is ConstantExpression)
-            {
-                if (!op.Expression.ToString().Contains("${")) return "";
-            }
-            else
-            {
-                const string resolverExp = ", value(AlbedoTeam.Sdk.QueryLanguage.Core.Languages.AlbedoQueryLanguage)";
-                if (op.Expression.ToString().Contains(resolverExp))
-                    // return $"{Deparse(op.Expression.ToString())}";
-                    return $"{op.Expression.ToString().Replace(resolverExp, "")}";
-            }
-
-            return $"{op.Expression}";
-        }
-
-        // private static string Deparse(string value)
-        // {
-        //     const string commaPattern = "[^,\\s][^\\,]*[^,\\s]*";
-        //     var commaReg = new Regex(commaPattern);
-        //     var commaMatches = commaReg.Matches(value);
-        //
-        //     if (commaMatches.Count != 3)
-        //         throw new OperandExpectedException(new StringSegment("Bad groups", 0, 0));
-        //
-        //     const string quotePattern = "\"[^\"]*\"";
-        //
-        //     var quoteReg = new Regex(quotePattern);
-        //     var quoteMatches = quoteReg.Matches(commaMatches[0].Value);
-        //     if (quoteMatches.Count != 1)
-        //         throw new OperandExpectedException(new StringSegment("Bad input", 0, 0));
-        //
-        //     var baseFormula = quoteMatches[0].Value.Replace("\"", "");
-        //     var input = commaMatches[1].Value;
-        //
-        //     return baseFormula.Replace("${input}", input);
-        // }
-
-        // public Expression<Func<T, decimal>> Parse<T>(string text)
-        // {
-        //     var parameters = new[] {Expression.Parameter(typeof(T))};
-        //     var (body, parsingState) = _language.Parse(text, parameters);
-        //     body = ExpressionConversions.Convert(body, typeof(decimal));
-        //     return Expression.Lambda<Func<T, decimal>>(body, parameters);
-        // }
-
-        protected virtual IEnumerable<GrammarDefinition> AllDefinitions()
+        private IEnumerable<GrammarDefinition> AllDefinitions()
         {
             IEnumerable<FunctionCallDefinition> functions;
             var definitions = new List<GrammarDefinition>();
@@ -125,13 +52,14 @@
             definitions.AddRange(TypeDefinitions());
             definitions.AddRange(functions = FunctionDefinitions());
             definitions.AddRange(BracketDefinitions(functions));
+            definitions.AddRange(LogicalOperatorDefinitions());
             definitions.AddRange(ArithmeticOperatorDefinitions());
             definitions.AddRange(PropertyDefinitions());
             definitions.AddRange(WhitespaceDefinitions());
             return definitions;
         }
 
-        protected virtual IEnumerable<GrammarDefinition> TypeDefinitions()
+        private IEnumerable<GrammarDefinition> TypeDefinitions()
         {
             return new[]
             {
@@ -155,7 +83,63 @@
             };
         }
 
-        protected virtual IEnumerable<FunctionCallDefinition> FunctionDefinitions()
+        private IEnumerable<GrammarDefinition> LogicalOperatorDefinitions()
+        {
+            return new GrammarDefinition[]
+            {
+                new BinaryOperatorDefinition(
+                    new Grammar("EQ", @"\b(eq)\b"),
+                    11,
+                    ConvertEnumsIfRequired(Expression.Equal)),
+
+                new BinaryOperatorDefinition(
+                    new Grammar("NE", @"\b(ne)\b"),
+                    12,
+                    ConvertEnumsIfRequired(Expression.NotEqual)),
+
+                new BinaryOperatorDefinition(
+                    new Grammar("GT", @"\b(gt)\b"),
+                    13,
+                    Expression.GreaterThan),
+
+                new BinaryOperatorDefinition(
+                    new Grammar("GE", @"\b(ge)\b"),
+                    14,
+                    Expression.GreaterThanOrEqual),
+
+                new BinaryOperatorDefinition(
+                    new Grammar("LT", @"\b(lt)\b"),
+                    15,
+                    Expression.LessThan),
+
+                new BinaryOperatorDefinition(
+                    new Grammar("LE", @"\b(le)\b"),
+                    16,
+                    Expression.LessThanOrEqual),
+
+                new BinaryOperatorDefinition(
+                    new Grammar("AND", @"\b(and)\b"),
+                    19,
+                    Expression.And),
+
+                new BinaryOperatorDefinition(
+                    new Grammar("OR", @"\b(or)\b"),
+                    20,
+                    Expression.Or),
+
+                new UnaryOperatorDefinition(
+                    new Grammar("NOT", @"\b(not)\b"),
+                    21,
+                    RelativePosition.Right,
+                    arg =>
+                    {
+                        ExpressionConversions.TryBoolean(ref arg);
+                        return Expression.Not(arg);
+                    })
+            };
+        }
+
+        private IEnumerable<FunctionCallDefinition> FunctionDefinitions()
         {
             return new[]
             {
@@ -166,7 +150,29 @@
                     {
                         return Expression.Call(
                             null,
-                            Type<object>.Method(x => AqlFunctions.Apply(null, 0, null)),
+                            Type<object>.Method(x => AqlFunctions.ApplyConversion(null, 0, null)),
+                            new[] {parameters[0], parameters[1], Expression.Constant(this)});
+                    }),
+
+                new FunctionCallDefinition(
+                    new Grammar("FN_IF", @"[Ii][Ff][(]"),
+                    new[] {typeof(bool), typeof(decimal), typeof(decimal), typeof(IAqlResolver)},
+                    parameters =>
+                    {
+                        return Expression.Call(
+                            null,
+                            Type<object>.Method(x => AqlFunctions.ApplyIf(false, 0, 0, null)), parameters[0],
+                            parameters[1], parameters[2], Expression.Constant(this));
+                    }),
+
+                new FunctionCallDefinition(
+                    new Grammar("FN_EACH", @"[Ee][Aa][Cc][Hh][(]"),
+                    new[] {typeof(List<decimal>), typeof(string), typeof(IAqlResolver)},
+                    parameters =>
+                    {
+                        return Expression.Call(
+                            null,
+                            Type<object>.Method(x => AqlFunctions.ApplyEach(null, null, null)),
                             new[] {parameters[0], parameters[1], Expression.Constant(this)});
                     }),
 
@@ -221,7 +227,7 @@
             };
         }
 
-        protected virtual IEnumerable<GrammarDefinition> BracketDefinitions(
+        private IEnumerable<GrammarDefinition> BracketDefinitions(
             IEnumerable<FunctionCallDefinition> functionCalls)
         {
             ParenthesisBracketOpenDefinition openParenthesisBracket;
@@ -261,7 +267,7 @@
             };
         }
 
-        protected virtual IEnumerable<GrammarDefinition> ArithmeticOperatorDefinitions()
+        private IEnumerable<GrammarDefinition> ArithmeticOperatorDefinitions()
         {
             return new[]
             {
@@ -292,7 +298,7 @@
             };
         }
 
-        protected virtual IEnumerable<GrammarDefinition> PropertyDefinitions()
+        private IEnumerable<GrammarDefinition> PropertyDefinitions()
         {
             return new[]
             {
@@ -307,11 +313,28 @@
             };
         }
 
-        protected virtual IEnumerable<GrammarDefinition> WhitespaceDefinitions()
+        private IEnumerable<GrammarDefinition> WhitespaceDefinitions()
         {
             return new[]
             {
                 new WhitespaceDefinition(new Grammar("WHITESPACE", @"\s+", true))
+            };
+        }
+
+        /// <summary>
+        ///     Wraps the function to convert any constants to enums if required
+        /// </summary>
+        /// <param name="expFn">Function to wrap</param>
+        /// <returns></returns>
+        private Func<Expression, Expression, Expression> ConvertEnumsIfRequired(
+            Func<Expression, Expression, Expression> expFn)
+        {
+            return (left, right) =>
+            {
+                var unused = ExpressionConversions.TryEnumNumberConvert(ref left, ref right)
+                             || ExpressionConversions.TryEnumStringConvert(ref left, ref right, true);
+
+                return expFn(left, right);
             };
         }
     }
