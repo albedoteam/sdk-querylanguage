@@ -37,8 +37,7 @@
             var bracketOperands = new Stack<Operand>();
             var previousSeperator = token.StringSegment;
             var hasSeperators = false;
-
-
+            
             while (state.Operators.Count > 0)
             {
                 var currentOperator = state.Operators.Pop();

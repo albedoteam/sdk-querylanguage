@@ -10,22 +10,26 @@
     public class SquareBracketCloseDefinition : GrammarDefinition
     {
         public readonly IReadOnlyCollection<SquareBracketOpenDefinition> BracketOpenDefinitions;
+        public readonly GrammarDefinition ListDelimeterDefinition;
 
         public SquareBracketCloseDefinition(
             Grammar grammar,
-            IEnumerable<SquareBracketOpenDefinition> bracketOpenDefinitions)
+            IEnumerable<SquareBracketOpenDefinition> bracketOpenDefinitions,
+            GrammarDefinition listDelimeterDefinition = null)
             : base(grammar)
         {
             if (bracketOpenDefinitions == null)
                 throw new ArgumentNullException(nameof(bracketOpenDefinitions));
 
             BracketOpenDefinitions = bracketOpenDefinitions.ToList();
+            ListDelimeterDefinition = listDelimeterDefinition;
         }
 
         public override void Apply(Token token, ParsingState state)
         {
             var bracketOperands = new Stack<Operand>();
             var previousSeperator = token.StringSegment;
+            var hasSeperators = false;
 
             while (state.Operators.Count > 0)
             {
@@ -34,9 +38,14 @@
                 {
                     var operand = state.Operands.Count > 0 ? state.Operands.Peek() : (Operand?) null;
                     var firstSegment = currentOperator.StringSegment;
+                    var secondSegment = previousSeperator;
 
-                    if (operand != null && operand.Value.StringSegment.IsBetween(firstSegment, previousSeperator))
+                    if (operand != null && operand.Value.StringSegment.IsBetween(firstSegment, secondSegment))
                         bracketOperands.Push(state.Operands.Pop());
+                    else if (hasSeperators && (operand == null ||
+                                               !operand.Value.StringSegment.IsBetween(firstSegment, secondSegment)))
+                        // if we have separators, then we should have something between the last separator and the open bracket
+                        throw new OperandExpectedException(StringSegment.Between(firstSegment, secondSegment));
 
                     var closeBracketOperator = new Operator(this, token.StringSegment, () => { });
 
@@ -49,7 +58,25 @@
                     return;
                 }
 
-                currentOperator.Execute();
+                if (ListDelimeterDefinition != null && currentOperator.Definition == ListDelimeterDefinition)
+                {
+                    hasSeperators = true;
+                    var operand = state.Operands.Pop();
+
+                    // if our operator is not between two delimiters, an operator is missing
+                    var firstSegment = currentOperator.StringSegment;
+                    var secondSegment = previousSeperator;
+                    if (!operand.StringSegment.IsBetween(firstSegment, secondSegment))
+                        throw new OperandExpectedException(StringSegment.Between(firstSegment, secondSegment));
+
+                    bracketOperands.Push(operand);
+                    previousSeperator = currentOperator.StringSegment;
+                }
+                else
+                {
+                    // regular operator, execute it
+                    currentOperator.Execute();
+                }
             }
 
             throw new BracketUnmatchedException(token.StringSegment);

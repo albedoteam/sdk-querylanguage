@@ -12,7 +12,7 @@
 
         public string ExpressionText { get; set; }
         public string Raw { get; set; }
-        public decimal Result { get; set; }
+        public object Result { get; set; }
 
         public List<Operand> InnerOps { get; set; }
     }

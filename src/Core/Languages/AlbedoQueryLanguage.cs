@@ -25,9 +25,9 @@
         public AqlFormula Parse(string text)
         {
             var (body, operands) = _language.Parse(text);
-            body = ExpressionConversions.Convert(body, typeof(decimal));
+            body = ExpressionConversions.Convert(body, typeof(object));
 
-            var expressionFunction = Expression.Lambda<Func<decimal>>(body);
+            var expressionFunction = Expression.Lambda<Func<object>>(body);
             var function = expressionFunction.Compile();
             var result = function();
 
@@ -72,6 +72,18 @@
                     new Grammar("OBJECTID",
                         @"[a-f\d]{24}"),
                     x => Expression.Constant(x.Trim('\''))),
+
+                new OperandDefinition(
+                    new Grammar("STRING",
+                        @"'(?:\\.|[^'])*'"),
+                    x => Expression.Constant(x.Trim('\'')
+                        .Replace("\\'", "'")
+                        .Replace("\\r", "\r")
+                        .Replace("\\f", "\f")
+                        .Replace("\\n", "\n")
+                        .Replace("\\\\", "\\")
+                        .Replace("\\b", "\b")
+                        .Replace("\\t", "\t"))),
 
                 new OperandDefinition(
                     new Grammar("DECIMAL", @"\-?\d+(\.\d+)?"),
@@ -145,7 +157,7 @@
             {
                 new FunctionCallDefinition(
                     new Grammar("FN_CONVERSION", @"[Ff][Xx][(]"),
-                    new[] {typeof(string), typeof(decimal), typeof(IAqlResolver)},
+                    new[] { typeof(string), typeof(decimal), typeof(IAqlResolver) },
                     parameters =>
                     {
                         return Expression.Call(
@@ -178,7 +190,7 @@
 
                 new FunctionCallDefinition(
                     new Grammar("FN_SIN", @"[Ss][Ii][Nn]\("),
-                    new[] {typeof(double)},
+                    new[] { typeof(double) },
                     parameters =>
                     {
                         return Expression.Call(
@@ -188,7 +200,7 @@
 
                 new FunctionCallDefinition(
                     new Grammar("FN_COS", @"[Cc][Oo][Ss]\("),
-                    new[] {typeof(double)},
+                    new[] { typeof(double) },
                     parameters =>
                     {
                         return Expression.Call(
@@ -198,7 +210,7 @@
 
                 new FunctionCallDefinition(
                     new Grammar("FN_TAN", @"[Tt][Aa][Nn]\("),
-                    new[] {typeof(double)},
+                    new[] { typeof(double) },
                     parameters =>
                     {
                         return Expression.Call(
@@ -208,7 +220,7 @@
 
                 new FunctionCallDefinition(
                     new Grammar("FN_SQRT", @"[Ss][Qq][Rr][Tt]\("),
-                    new[] {typeof(double)},
+                    new[] { typeof(double) },
                     parameters =>
                     {
                         return Expression.Call(
@@ -217,12 +229,12 @@
                     }),
 
                 new FunctionCallDefinition(new Grammar("FN_POW", @"[Pp][Oo][Ww]\("),
-                    new[] {typeof(double), typeof(double)},
+                    new[] { typeof(double), typeof(double) },
                     parameters =>
                     {
                         return Expression.Call(
                             null,
-                            Type<object>.Method(x => Math.Pow(0, 0)), new[] {parameters[0], parameters[1]});
+                            Type<object>.Method(x => Math.Pow(0, 0)), new[] { parameters[0], parameters[1] });
                     })
             };
         }
@@ -246,7 +258,7 @@
 
                 new ParenthesisBracketCloseDefinition(
                     new Grammar("CLOSE_PARENTHESIS_BRACKET", @"\)"),
-                    new[] {openParenthesisBracket}.Concat(functionCalls),
+                    new[] { openParenthesisBracket }.Concat(functionCalls),
                     delimeter),
 
                 openSquareBracket = new SquareBracketOpenDefinition(
@@ -255,7 +267,7 @@
 
                 new SquareBracketCloseDefinition(
                     new Grammar("CLOSE_SQUARE_BRACKET", @"\]"),
-                    new[] {openSquareBracket}),
+                    new[] { openSquareBracket }, delimeter),
 
                 openAngleBracket = new AngleBracketOpenDefinition(
                     new Grammar("OPEN_ANGLE_BRACKET", @"\<"),
@@ -263,7 +275,7 @@
 
                 new AngleBracketCloseDefinition(
                     new Grammar("CLOSE_ANGLE_BRACKET", @"\>"),
-                    new[] {openAngleBracket})
+                    new[] { openAngleBracket })
             };
         }
 
@@ -307,7 +319,7 @@
                     (value, parameters) =>
                     {
                         return value.Split('.').Aggregate(
-                            (Expression) parameters[0],
+                            (Expression)parameters[0],
                             (exp, prop) => Expression.MakeMemberAccess(exp, TypeShim.GetProperty(exp.Type, prop)));
                     })
             };

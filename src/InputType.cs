@@ -6,6 +6,7 @@
         Operand,
         Operator,
         Resolver,
-        Function
+        Function,
+        TableResolver
     }
 }
