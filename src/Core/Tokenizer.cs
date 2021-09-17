@@ -39,7 +39,7 @@
 
                 var matchedTokenDefinition =
                     GrammarDefinitions.FirstOrDefault(g => match.Groups[g.Grammar.Name].Success);
-                if (matchedTokenDefinition is {Grammar: {Ignore: true}})
+                if (matchedTokenDefinition is { Grammar: { Ignore: true } })
                     continue;
 
                 yield return new Token(

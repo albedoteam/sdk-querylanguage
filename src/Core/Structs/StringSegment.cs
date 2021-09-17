@@ -69,7 +69,7 @@
 
         public static StringSegment Encompass(params StringSegment[] segments)
         {
-            return Encompass((IEnumerable<StringSegment>) segments);
+            return Encompass((IEnumerable<StringSegment>)segments);
         }
 
         public bool IsBetween(StringSegment segment1, StringSegment segment2)

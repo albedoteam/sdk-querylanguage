@@ -23,7 +23,7 @@
             //if its a constant we can avoid compiling a lambda and get the value directly
             if (exp is ConstantExpression constExp)
             {
-                result = (T) constExp.Value;
+                result = (T)constExp.Value;
                 return true;
             }
 

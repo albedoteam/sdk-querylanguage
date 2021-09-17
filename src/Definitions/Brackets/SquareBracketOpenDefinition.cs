@@ -49,9 +49,9 @@
             {
                 // table reference
                 var (expression, innerDep) = ResolveCell(bracketOperands);
-                
+
                 var bracketOperand = bracketOperands.Pop();
-                
+
                 var sourceMap = StringSegment.Encompass(
                     bracketOpen.StringSegment,
                     bracketOperand.StringSegment,
@@ -101,7 +101,7 @@
             var innerListResult = Expression.Constant(listValues);
             return (innerListResult, null);
         }
-        
+
         private (ConstantExpression, InnerDep) ResolveCell(Stack<Operand> brackets)
         {
             var idToBeResolved = new List<string>();
@@ -109,16 +109,16 @@
             {
                 var le = Expression.Lambda<Func<string>>(bracket.Expression);
                 var compiledExpression = le.Compile();
-                
+
                 idToBeResolved.Add(compiledExpression());
             }
 
             var idsToResolve = string.Join(",", idToBeResolved);
-            
+
             var response = _language.Resolver.ReferenceResolver(new ResolverRequest
             {
                 InputId = idsToResolve,
-                InputType = InputType.Resolver
+                InputType = InputType.TableResolver
             }).Result;
 
             if (response.Values.Count == 1 && !response.AllowsMultipleValues)

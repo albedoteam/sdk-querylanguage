@@ -6,4 +6,8 @@
         <RootNamespace>AlbedoTeam.Sdk.QueryLanguage</RootNamespace>
     </PropertyGroup>
 
+    <ItemGroup>
+        <PackageReference Include="GreenDomus.Catalog.Contracts" Version="1.0.0-CI-20210728-220855"/>
+    </ItemGroup>
+
 </Project>

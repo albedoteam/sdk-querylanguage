@@ -184,7 +184,7 @@
                 return true;
 
             var left = exp;
-            var right = (Expression) Expression.Constant(true);
+            var right = (Expression)Expression.Constant(true);
             if (!TryImplicitlyConvert(ref left, ref right))
                 return false;
 

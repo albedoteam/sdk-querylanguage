@@ -8,7 +8,7 @@
 
     public class BinaryOperatorDefinition : OperatorDefinition
     {
-        private static readonly RelativePosition[] LeftRight = {RelativePosition.Left, RelativePosition.Right};
+        private static readonly RelativePosition[] LeftRight = { RelativePosition.Left, RelativePosition.Right };
 
         public BinaryOperatorDefinition(
             Grammar grammar,

@@ -93,7 +93,7 @@
 
 
                 var sourceMapSpan =
-                    StringSegment.Encompass(new[] {token.StringSegment}.Concat(args.Select(x => x.StringSegment)));
+                    StringSegment.Encompass(new[] { token.StringSegment }.Concat(args.Select(x => x.StringSegment)));
 
                 Expression expression;
                 try

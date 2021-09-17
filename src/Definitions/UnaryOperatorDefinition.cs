@@ -23,7 +23,7 @@
             int orderOfPrecedence,
             RelativePosition operandPosition,
             Func<Expression, Expression> expressionBuilder)
-            : base(grammar, orderOfPrecedence, new[] {operandPosition}, param => expressionBuilder(param[0]))
+            : base(grammar, orderOfPrecedence, new[] { operandPosition }, param => expressionBuilder(param[0]))
         {
         }
     }

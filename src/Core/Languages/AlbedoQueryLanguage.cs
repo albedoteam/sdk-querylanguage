@@ -163,12 +163,12 @@
                         return Expression.Call(
                             null,
                             Type<object>.Method(x => AqlFunctions.ApplyConversion(null, 0, null)),
-                            new[] {parameters[0], parameters[1], Expression.Constant(this)});
+                            new[] { parameters[0], parameters[1], Expression.Constant(this) });
                     }),
 
                 new FunctionCallDefinition(
                     new Grammar("FN_IF", @"[Ii][Ff][(]"),
-                    new[] {typeof(bool), typeof(decimal), typeof(decimal), typeof(IAqlResolver)},
+                    new[] { typeof(bool), typeof(decimal), typeof(decimal), typeof(IAqlResolver) },
                     parameters =>
                     {
                         return Expression.Call(
@@ -179,13 +179,13 @@
 
                 new FunctionCallDefinition(
                     new Grammar("FN_EACH", @"[Ee][Aa][Cc][Hh][(]"),
-                    new[] {typeof(List<decimal>), typeof(string), typeof(IAqlResolver)},
+                    new[] { typeof(List<decimal>), typeof(string), typeof(IAqlResolver) },
                     parameters =>
                     {
                         return Expression.Call(
                             null,
                             Type<object>.Method(x => AqlFunctions.ApplyEach(null, null, null)),
-                            new[] {parameters[0], parameters[1], Expression.Constant(this)});
+                            new[] { parameters[0], parameters[1], Expression.Constant(this) });
                     }),
 
                 new FunctionCallDefinition(

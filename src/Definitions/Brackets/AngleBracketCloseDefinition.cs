@@ -32,7 +32,7 @@
                 var currentOperator = state.Operators.Pop();
                 if (BracketOpenDefinitions.Contains(currentOperator.Definition))
                 {
-                    var operand = state.Operands.Count > 0 ? state.Operands.Peek() : (Operand?) null;
+                    var operand = state.Operands.Count > 0 ? state.Operands.Peek() : (Operand?)null;
                     var firstSegment = currentOperator.StringSegment;
 
                     if (operand != null && operand.Value.StringSegment.IsBetween(firstSegment, previousSeperator))
@@ -40,7 +40,7 @@
 
                     var closeBracketOperator = new Operator(this, token.StringSegment, () => { });
 
-                    ((AngleBracketOpenDefinition) currentOperator.Definition).ApplyBracketOperands(
+                    ((AngleBracketOpenDefinition)currentOperator.Definition).ApplyBracketOperands(
                         currentOperator,
                         bracketOperands,
                         closeBracketOperator,

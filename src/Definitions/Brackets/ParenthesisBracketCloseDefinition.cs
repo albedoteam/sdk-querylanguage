@@ -28,7 +28,7 @@
             Grammar grammar,
             ParenthesisBracketOpenDefinition bracketOpenDefinition,
             GrammarDefinition listDelimeterDefinition = null)
-            : this(grammar, new[] {bracketOpenDefinition}, listDelimeterDefinition)
+            : this(grammar, new[] { bracketOpenDefinition }, listDelimeterDefinition)
         {
         }
 
@@ -37,13 +37,13 @@
             var bracketOperands = new Stack<Operand>();
             var previousSeperator = token.StringSegment;
             var hasSeperators = false;
-            
+
             while (state.Operators.Count > 0)
             {
                 var currentOperator = state.Operators.Pop();
                 if (BracketOpenDefinitions.Contains(currentOperator.Definition))
                 {
-                    var operand = state.Operands.Count > 0 ? state.Operands.Peek() : (Operand?) null;
+                    var operand = state.Operands.Count > 0 ? state.Operands.Peek() : (Operand?)null;
                     var firstSegment = currentOperator.StringSegment;
                     var secondSegment = previousSeperator;
 
@@ -58,7 +58,7 @@
                     // pass all of our bracket operands to the bracket method, it will know what to do
                     var closeBracketOperator = new Operator(this, token.StringSegment, () => { });
 
-                    ((ParenthesisBracketOpenDefinition) currentOperator.Definition).ApplyBracketOperands(
+                    ((ParenthesisBracketOpenDefinition)currentOperator.Definition).ApplyBracketOperands(
                         currentOperator,
                         bracketOperands,
                         closeBracketOperator,
