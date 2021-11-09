@@ -24,7 +24,17 @@
 
         public AqlFormula Parse(string text)
         {
-            var (body, operands) = _language.Parse(text);
+            var context = new FormulaContext
+            {
+                Formula = text
+            };
+
+            return Parse(context);
+        }
+
+        public AqlFormula Parse(FormulaContext context)
+        {
+            var (body, operands) = _language.Parse(context);
             body = ExpressionConversions.Convert(body, typeof(object));
 
             var expressionFunction = Expression.Lambda<Func<object>>(body);
@@ -33,7 +43,7 @@
 
             var frml = new AqlFormula
             {
-                ExpressionText = text,
+                Context = context,
                 Result = result
             };
 

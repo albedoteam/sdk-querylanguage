@@ -21,6 +21,7 @@
 
         public override void Apply(Token token, ParsingState state)
         {
+            state.Context = token.Context;
             state.Operators.Push(new Operator(
                 this,
                 token.StringSegment,
@@ -46,7 +47,7 @@
             }
 
             var bracketOperand = bracketOperands.Pop();
-            var (expression, innerDep) = Resolve(bracketOpen, bracketOperand, bracketClose);
+            var (expression, innerDep) = Resolve(bracketOpen, bracketOperand, bracketClose, state.Context);
 
             var sourceMap = StringSegment.Encompass(
                 bracketOpen.StringSegment,
@@ -59,7 +60,8 @@
         private (ConstantExpression, InnerDep) Resolve(
             Operator bracketOpen,
             Operand bracketOperand,
-            Operator bracketClose)
+            Operator bracketClose,
+            FormulaContext context)
         {
             var le = Expression.Lambda<Func<string>>(bracketOperand.Expression);
             var compiledExpression = le.Compile();
@@ -67,12 +69,16 @@
 
             var response = _language.Resolver.ReferenceResolver(new ResolverRequest
             {
+                Context = context,
                 InputId = idToBeResolved,
                 InputType = InputType.Function
             }).Result;
 
-            if (response.Values[0].Contains("${"))
-                return (Expression.Constant(response.Values[0]), new InnerDep(null, response));
+            if (response.ResolverResults is { } && response.ResolverResults.Count > 0)
+            {
+                if (response.ResolverResults[0].Value.Contains("${"))
+                    return (Expression.Constant(response.ResolverResults[0].Value), new InnerDep(null, response));
+            }
 
             var insideBrackets = StringSegment.Between(bracketOpen.StringSegment, bracketClose.StringSegment);
             throw new OperandExpectedException(insideBrackets);

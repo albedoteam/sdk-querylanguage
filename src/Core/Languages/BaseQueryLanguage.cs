@@ -18,23 +18,16 @@
 
         public IReadOnlyList<GrammarDefinition> TokenDefinitions => Tokenizer.GrammarDefinitions;
 
-        public (Expression, Dictionary<string, Operand>) Parse(string text, params ParameterExpression[] parameters)
+        // public (Expression, Dictionary<string, Operand>) Parse(string text, params ParameterExpression[] parameters)
+        // {
+        //     var tokenStream = Tokenizer.Tokenize(text);
+        //     return Parser.Parse(tokenStream, parameters);
+        // }
+        
+        public (Expression, Dictionary<string, Operand>) Parse(FormulaContext context, params ParameterExpression[] parameters)
         {
-            var tokenStream = Tokenizer.Tokenize(text);
+            var tokenStream = Tokenizer.Tokenize(context);
             return Parser.Parse(tokenStream, parameters);
         }
-
-        // public Expression<Func<TOut>> Parse<TOut>(string text)
-        // {
-        //     var body = Parse(text);
-        //     return Expression.Lambda<Func<TOut>>(body);
-        // }
-        //
-        // public Expression<Func<TIn, TOut>> Parse<TIn, TOut>(string text)
-        // {
-        //     var parameters = new[] {Expression.Parameter(typeof(TIn))};
-        //     var body = Parse(text, parameters);
-        //     return Expression.Lambda<Func<TIn, TOut>>(body, parameters);
-        // }
     }
 }

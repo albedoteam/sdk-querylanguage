@@ -21,6 +21,7 @@
 
         public override void Apply(Token token, ParsingState state)
         {
+            state.Context = token.Context;
             state.Operators.Push(new Operator(
                 this,
                 token.StringSegment,
@@ -48,7 +49,7 @@
             if (bracketOperands.Count == 2)
             {
                 // table reference
-                var (expression, innerDep) = ResolveCell(bracketOperands);
+                var (expression, innerDep) = ResolveCell(bracketOperands, state.Context);
 
                 var bracketOperand = bracketOperands.Pop();
 
@@ -62,7 +63,7 @@
             else
             {
                 var bracketOperand = bracketOperands.Pop();
-                var (expression, innerDep) = Resolve(bracketOperand);
+                var (expression, innerDep) = Resolve(bracketOperand, state.Context);
 
                 var sourceMap = StringSegment.Encompass(
                     bracketOpen.StringSegment,
@@ -73,7 +74,7 @@
             }
         }
 
-        private (ConstantExpression, InnerDep) Resolve(Operand bracketOperand)
+        private (ConstantExpression, InnerDep) Resolve(Operand bracketOperand, FormulaContext context)
         {
             var le = Expression.Lambda<Func<string>>(bracketOperand.Expression);
             var compiledExpression = le.Compile();
@@ -81,28 +82,44 @@
 
             var response = _language.Resolver.ReferenceResolver(new ResolverRequest
             {
+                Context = context,
                 InputId = idToBeResolved,
                 InputType = InputType.Resolver
             }).Result;
 
-            if (response.Values.Count == 1 && !response.AllowsMultipleValues)
+            if (response.ResolverResults is { } || response.ResolverResults.Count > 0)
             {
-                var aqlFormula = _language.Parse(response.Values[0]);
-                var innerExpressionResult = Expression.Constant(aqlFormula.Result);
+                if (response.ResolverResults.Count == 1 && !response.AllowsMultipleValues)
+                {
+                    var aqlFormula = _language.Parse(new FormulaContext
+                    {
+                        Metadata = context.Metadata,
+                        Formula = response.ResolverResults[0].Value
+                    });
+                    
+                    var innerExpressionResult = Expression.Constant(aqlFormula.Result);
 
-                return (innerExpressionResult, new InnerDep(aqlFormula, response));
+                    return (innerExpressionResult, new InnerDep(aqlFormula, response));
+                }
+
+                var listValues = response.ResolverResults
+                    .Select(result => _language.Parse(new FormulaContext
+                    {
+                        Metadata = context.Metadata,
+                        Formula = result.Value
+                    }))
+                    .Select(aqlFormula => aqlFormula.Result)
+                    .ToList();
+
+                var innerListResult = Expression.Constant(listValues);
+                return (innerListResult, null);
             }
 
-            var listValues = response.Values
-                .Select(value => _language.Parse(value))
-                .Select(aqlFormula => aqlFormula.Result)
-                .ToList();
-
-            var innerListResult = Expression.Constant(listValues);
-            return (innerListResult, null);
+            var innerEmptyResult = Expression.Constant(0);
+            return (innerEmptyResult, null);
         }
 
-        private (ConstantExpression, InnerDep) ResolveCell(Stack<Operand> brackets)
+        private (ConstantExpression, InnerDep) ResolveCell(Stack<Operand> brackets, FormulaContext context)
         {
             var idToBeResolved = new List<string>();
             foreach (var bracket in brackets)
@@ -117,25 +134,41 @@
 
             var response = _language.Resolver.ReferenceResolver(new ResolverRequest
             {
+                Context = context,
                 InputId = idsToResolve,
                 InputType = InputType.TableResolver
             }).Result;
 
-            if (response.Values.Count == 1 && !response.AllowsMultipleValues)
+            if (response.ResolverResults is { } || response.ResolverResults.Count > 0)
             {
-                var aqlFormula = _language.Parse(response.Values[0]);
-                var innerExpressionResult = Expression.Constant(aqlFormula.Result);
+                if (response.ResolverResults.Count == 1 && !response.AllowsMultipleValues)
+                {
+                    var aqlFormula = _language.Parse(new FormulaContext
+                    {
+                        Metadata = context.Metadata,
+                        Formula = response.ResolverResults[0].Value
+                    });
 
-                return (innerExpressionResult, new InnerDep(aqlFormula, response));
+                    var innerExpressionResult = Expression.Constant(aqlFormula.Result);
+
+                    return (innerExpressionResult, new InnerDep(aqlFormula, response));
+                }
+
+                var listValues = response.ResolverResults
+                    .Select(result => _language.Parse(new FormulaContext
+                    {
+                        Metadata = context.Metadata,
+                        Formula = result.Value
+                    }))
+                    .Select(aqlFormula => aqlFormula.Result)
+                    .ToList();
+
+                var innerListResult = Expression.Constant(listValues);
+                return (innerListResult, null);
             }
 
-            var listValues = response.Values
-                .Select(value => _language.Parse(value))
-                .Select(aqlFormula => aqlFormula.Result)
-                .ToList();
-
-            var innerListResult = Expression.Constant(listValues);
-            return (innerListResult, null);
+            var innerEmptyResult = Expression.Constant(0);
+            return (innerEmptyResult, null);
         }
     }
 }

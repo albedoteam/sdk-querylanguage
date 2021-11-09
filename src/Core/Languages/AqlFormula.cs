@@ -10,7 +10,7 @@
             InnerOps = new List<Operand>();
         }
 
-        public string ExpressionText { get; set; }
+        public FormulaContext Context { get; set; }
         public string Raw { get; set; }
         public object Result { get; set; }
 

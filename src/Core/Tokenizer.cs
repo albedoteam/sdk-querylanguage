@@ -45,7 +45,38 @@
                 yield return new Token(
                     matchedTokenDefinition,
                     match.Value,
-                    new StringSegment(text, match.Index, match.Length));
+                    new StringSegment(text, match.Index, match.Length),
+                    new FormulaContext
+                    {
+                        Formula = text
+                    });
+            }
+        }
+
+        public IEnumerable<Token> Tokenize(FormulaContext context)
+        {
+            var matches = TokenRegex.Matches(context.Formula).OfType<Match>();
+
+            var expectedIndex = 0;
+            foreach (var match in matches)
+            {
+                if (match.Index > expectedIndex)
+                    throw new GrammarUnknownException(new StringSegment(context.Formula, expectedIndex,
+                        match.Index - expectedIndex));
+
+                expectedIndex = match.Index + match.Length;
+
+                var matchedTokenDefinition =
+                    GrammarDefinitions.FirstOrDefault(g => match.Groups[g.Grammar.Name].Success);
+
+                if (matchedTokenDefinition is { Grammar: { Ignore: true } })
+                    continue;
+
+                yield return new Token(
+                    matchedTokenDefinition,
+                    match.Value,
+                    new StringSegment(context.Formula, match.Index, match.Length),
+                    context);
             }
         }
     }
