@@ -1,9 +1,13 @@
 ﻿namespace AlbedoTeam.Sdk.QueryLanguage.Injections
 {
     using System.Threading.Tasks;
+    using Core.Languages;
 
-    public interface IAqlResolver
+    public interface IAqlResolver<TContext>
+        where TContext : IResolverContext
     {
-        Task<ResolverResponse> ReferenceResolver(ResolverRequest request);
+        Task<IResolverResponse<TContext>> ReferenceResolver(
+            AlbedoQueryLanguage<TContext> language,
+            IResolverRequest<TContext> request);
     }
 }

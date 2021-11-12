@@ -4,8 +4,10 @@
     using Core.States;
     using Core.Structs;
     using Exceptions;
+    using Injections;
 
-    public abstract class GrammarDefinition
+    public abstract class GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
         private static readonly Regex NameValidation = new Regex("^[a-zA-Z0-9_]+$");
 
@@ -19,6 +21,6 @@
 
         public Grammar Grammar { get; }
 
-        public abstract void Apply(Token token, ParsingState state);
+        public abstract void Apply(Token<TContext> token, ParsingState<TContext> state);
     }
 }

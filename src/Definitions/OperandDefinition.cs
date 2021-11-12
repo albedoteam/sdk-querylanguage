@@ -5,8 +5,10 @@
     using Core.States;
     using Core.Structs;
     using Exceptions;
+    using Injections;
 
-    public class OperandDefinition : GrammarDefinition
+    public class OperandDefinition<TContext> : GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
         public readonly Func<string, ParameterExpression[], Expression> ExpressionBuilder;
 
@@ -25,7 +27,7 @@
             ExpressionBuilder = expressionBuilder ?? throw new ArgumentNullException(nameof(expressionBuilder));
         }
 
-        public override void Apply(Token token, ParsingState state)
+        public override void Apply(Token<TContext> token, ParsingState<TContext> state)
         {
             Expression expression;
             try

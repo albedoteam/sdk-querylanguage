@@ -81,7 +81,7 @@
 //         //     var baseFormula = quoteMatches[0].Value.Replace("\"", "");
 //         //     var input = commaMatches[1].Value;
 //         //
-//         //     return baseFormula.Replace("${input}", input);
+//         //     return baseFormula.Replace("${x}", input);
 //         // }
 //
 //         // public Expression<Func<T, decimal>> Parse<T>(string text)

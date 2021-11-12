@@ -2,17 +2,19 @@
 {
     using System;
     using Definitions;
+    using Injections;
 
-    public struct Operator
+    public struct Operator<TContext>
+        where TContext : IResolverContext
     {
-        public Operator(GrammarDefinition definition, StringSegment stringSegment, Action execute)
+        public Operator(GrammarDefinition<TContext> definition, StringSegment stringSegment, Action execute)
         {
             Definition = definition;
             Execute = execute;
             StringSegment = stringSegment;
         }
 
-        public GrammarDefinition Definition { get; }
+        public GrammarDefinition<TContext> Definition { get; }
         public Action Execute { get; }
         public StringSegment StringSegment { get; }
 

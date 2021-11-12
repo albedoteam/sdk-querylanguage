@@ -6,16 +6,18 @@
     using Core.States;
     using Core.Structs;
     using Exceptions;
+    using Injections;
 
-    public class SquareBracketCloseDefinition : GrammarDefinition
+    public class SquareBracketCloseDefinition<TContext> : GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
-        public readonly IReadOnlyCollection<SquareBracketOpenDefinition> BracketOpenDefinitions;
-        public readonly GrammarDefinition ListDelimeterDefinition;
+        public readonly IReadOnlyCollection<SquareBracketOpenDefinition<TContext>> BracketOpenDefinitions;
+        public readonly GrammarDefinition<TContext> ListDelimeterDefinition;
 
         public SquareBracketCloseDefinition(
             Grammar grammar,
-            IEnumerable<SquareBracketOpenDefinition> bracketOpenDefinitions,
-            GrammarDefinition listDelimeterDefinition = null)
+            IEnumerable<SquareBracketOpenDefinition<TContext>> bracketOpenDefinitions,
+            GrammarDefinition<TContext> listDelimeterDefinition = null)
             : base(grammar)
         {
             if (bracketOpenDefinitions == null)
@@ -25,7 +27,7 @@
             ListDelimeterDefinition = listDelimeterDefinition;
         }
 
-        public override void Apply(Token token, ParsingState state)
+        public override void Apply(Token<TContext> token, ParsingState<TContext> state)
         {
             var bracketOperands = new Stack<Operand>();
             var previousSeperator = token.StringSegment;
@@ -47,9 +49,9 @@
                         // if we have separators, then we should have something between the last separator and the open bracket
                         throw new OperandExpectedException(StringSegment.Between(firstSegment, secondSegment));
 
-                    var closeBracketOperator = new Operator(this, token.StringSegment, () => { });
+                    var closeBracketOperator = new Operator<TContext>(this, token.StringSegment, () => { });
 
-                    ((SquareBracketOpenDefinition)currentOperator.Definition).ApplyBracketOperands(
+                    ((SquareBracketOpenDefinition<TContext>)currentOperator.Definition).ApplyBracketOperands(
                         currentOperator,
                         bracketOperands,
                         closeBracketOperator,

@@ -6,16 +6,18 @@
     using Core.States;
     using Core.Structs;
     using Exceptions;
+    using Injections;
 
-    public class ParenthesisBracketCloseDefinition : GrammarDefinition
+    public class ParenthesisBracketCloseDefinition<TContext> : GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
-        public readonly IReadOnlyCollection<ParenthesisBracketOpenDefinition> BracketOpenDefinitions;
-        public readonly GrammarDefinition ListDelimeterDefinition;
+        public readonly IReadOnlyCollection<ParenthesisBracketOpenDefinition<TContext>> BracketOpenDefinitions;
+        public readonly GrammarDefinition<TContext> ListDelimeterDefinition;
 
         public ParenthesisBracketCloseDefinition(
             Grammar grammar,
-            IEnumerable<ParenthesisBracketOpenDefinition> bracketOpenDefinitions,
-            GrammarDefinition listDelimeterDefinition = null) : base(grammar)
+            IEnumerable<ParenthesisBracketOpenDefinition<TContext>> bracketOpenDefinitions,
+            GrammarDefinition<TContext> listDelimeterDefinition = null) : base(grammar)
         {
             if (bracketOpenDefinitions == null)
                 throw new ArgumentNullException(nameof(bracketOpenDefinitions));
@@ -26,13 +28,13 @@
 
         public ParenthesisBracketCloseDefinition(
             Grammar grammar,
-            ParenthesisBracketOpenDefinition bracketOpenDefinition,
-            GrammarDefinition listDelimeterDefinition = null)
+            ParenthesisBracketOpenDefinition<TContext> bracketOpenDefinition,
+            GrammarDefinition<TContext> listDelimeterDefinition = null)
             : this(grammar, new[] { bracketOpenDefinition }, listDelimeterDefinition)
         {
         }
 
-        public override void Apply(Token token, ParsingState state)
+        public override void Apply(Token<TContext> token, ParsingState<TContext> state)
         {
             var bracketOperands = new Stack<Operand>();
             var previousSeperator = token.StringSegment;
@@ -56,9 +58,9 @@
                         throw new OperandExpectedException(StringSegment.Between(firstSegment, secondSegment));
 
                     // pass all of our bracket operands to the bracket method, it will know what to do
-                    var closeBracketOperator = new Operator(this, token.StringSegment, () => { });
+                    var closeBracketOperator = new Operator<TContext>(this, token.StringSegment, () => { });
 
-                    ((ParenthesisBracketOpenDefinition)currentOperator.Definition).ApplyBracketOperands(
+                    ((ParenthesisBracketOpenDefinition<TContext>)currentOperator.Definition).ApplyBracketOperands(
                         currentOperator,
                         bracketOperands,
                         closeBracketOperator,

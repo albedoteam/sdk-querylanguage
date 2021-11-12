@@ -11,53 +11,44 @@
     using Structs;
     using Utility;
 
-    public sealed class AlbedoQueryLanguage
+    public sealed class AlbedoQueryLanguage<TContext>
+        where TContext : IResolverContext
     {
-        private readonly BaseQueryLanguage _language;
-        public readonly IAqlResolver Resolver;
+        private readonly BaseQueryLanguage<TContext> _language;
+        public readonly IAqlResolver<TContext> Resolver;
 
-        public AlbedoQueryLanguage(IAqlResolver resolver)
+        public AlbedoQueryLanguage(IAqlResolver<TContext> resolver)
         {
             Resolver = resolver;
-            _language = new BaseQueryLanguage(AllDefinitions().ToArray());
+            _language = new BaseQueryLanguage<TContext>(AllDefinitions().ToArray());
         }
 
-        public AqlFormula Parse(string text)
-        {
-            var context = new FormulaContext
-            {
-                Formula = text
-            };
+        public TContext Context { get; private set; }
 
-            return Parse(context);
-        }
-
-        public AqlFormula Parse(FormulaContext context)
+        public ParseResponse<TContext> Parse(ParseRequest<TContext> request)
         {
-            var (body, operands) = _language.Parse(context);
+            Context = request.Context;
+
+            var body = _language.Parse(request);
             body = ExpressionConversions.Convert(body, typeof(object));
 
             var expressionFunction = Expression.Lambda<Func<object>>(body);
             var function = expressionFunction.Compile();
             var result = function();
 
-            var frml = new AqlFormula
+            var response = new ParseResponse<TContext>
             {
-                Context = context,
+                Request = request,
                 Result = result
             };
 
-            foreach (var (_, value) in operands)
-                if (value.InnerDep != null)
-                    frml.InnerOps.Add(value);
-
-            return frml;
+            return response;
         }
 
-        private IEnumerable<GrammarDefinition> AllDefinitions()
+        private IEnumerable<GrammarDefinition<TContext>> AllDefinitions()
         {
-            IEnumerable<FunctionCallDefinition> functions;
-            var definitions = new List<GrammarDefinition>();
+            IEnumerable<FunctionCallDefinition<TContext>> functions;
+            var definitions = new List<GrammarDefinition<TContext>>();
 
             definitions.AddRange(TypeDefinitions());
             definitions.AddRange(functions = FunctionDefinitions());
@@ -69,21 +60,21 @@
             return definitions;
         }
 
-        private IEnumerable<GrammarDefinition> TypeDefinitions()
+        private IEnumerable<GrammarDefinition<TContext>> TypeDefinitions()
         {
             return new[]
             {
-                new OperandDefinition(
+                new OperandDefinition<TContext>(
                     new Grammar("GUID",
                         @"[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12}"),
                     x => Expression.Constant(Guid.Parse(x.Trim('\'')))),
 
-                new OperandDefinition(
+                new OperandDefinition<TContext>(
                     new Grammar("OBJECTID",
                         @"[a-f\d]{24}"),
                     x => Expression.Constant(x.Trim('\''))),
 
-                new OperandDefinition(
+                new OperandDefinition<TContext>(
                     new Grammar("STRING",
                         @"'(?:\\.|[^'])*'"),
                     x => Expression.Constant(x.Trim('\'')
@@ -95,61 +86,61 @@
                         .Replace("\\b", "\b")
                         .Replace("\\t", "\t"))),
 
-                new OperandDefinition(
+                new OperandDefinition<TContext>(
                     new Grammar("DECIMAL", @"\-?\d+(\.\d+)?"),
                     x => Expression.Constant(decimal.Parse(x))),
 
-                new OperandDefinition(
+                new OperandDefinition<TContext>(
                     new Grammar("PI", @"[Pp][Ii]"),
                     x => Expression.Constant(Math.PI))
             };
         }
 
-        private IEnumerable<GrammarDefinition> LogicalOperatorDefinitions()
+        private IEnumerable<GrammarDefinition<TContext>> LogicalOperatorDefinitions()
         {
-            return new GrammarDefinition[]
+            return new GrammarDefinition<TContext>[]
             {
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("EQ", @"\b(eq)\b"),
                     11,
                     ConvertEnumsIfRequired(Expression.Equal)),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("NE", @"\b(ne)\b"),
                     12,
                     ConvertEnumsIfRequired(Expression.NotEqual)),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("GT", @"\b(gt)\b"),
                     13,
                     Expression.GreaterThan),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("GE", @"\b(ge)\b"),
                     14,
                     Expression.GreaterThanOrEqual),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("LT", @"\b(lt)\b"),
                     15,
                     Expression.LessThan),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("LE", @"\b(le)\b"),
                     16,
                     Expression.LessThanOrEqual),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("AND", @"\b(and)\b"),
                     19,
                     Expression.And),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("OR", @"\b(or)\b"),
                     20,
                     Expression.Or),
 
-                new UnaryOperatorDefinition(
+                new UnaryOperatorDefinition<TContext>(
                     new Grammar("NOT", @"\b(not)\b"),
                     21,
                     RelativePosition.Right,
@@ -161,44 +152,44 @@
             };
         }
 
-        private IEnumerable<FunctionCallDefinition> FunctionDefinitions()
+        private IEnumerable<FunctionCallDefinition<TContext>> FunctionDefinitions()
         {
             return new[]
             {
-                new FunctionCallDefinition(
+                new FunctionCallDefinition<TContext>(
                     new Grammar("FN_CONVERSION", @"[Ff][Xx][(]"),
-                    new[] { typeof(string), typeof(decimal), typeof(IAqlResolver) },
+                    new[] { typeof(string), typeof(decimal), typeof(IAqlResolver<>) },
                     parameters =>
                     {
                         return Expression.Call(
                             null,
-                            Type<object>.Method(x => AqlFunctions.ApplyConversion(null, 0, null)),
+                            Type<object>.Method(x => AqlFunctions.ApplyConversion<TContext>(null, 0, null)),
                             new[] { parameters[0], parameters[1], Expression.Constant(this) });
                     }),
 
-                new FunctionCallDefinition(
+                new FunctionCallDefinition<TContext>(
                     new Grammar("FN_IF", @"[Ii][Ff][(]"),
-                    new[] { typeof(bool), typeof(decimal), typeof(decimal), typeof(IAqlResolver) },
+                    new[] { typeof(bool), typeof(decimal), typeof(decimal), typeof(IAqlResolver<>) },
                     parameters =>
                     {
                         return Expression.Call(
                             null,
-                            Type<object>.Method(x => AqlFunctions.ApplyIf(false, 0, 0, null)), parameters[0],
+                            Type<object>.Method(x => AqlFunctions.ApplyIf<TContext>(false, 0, 0, null)), parameters[0],
                             parameters[1], parameters[2], Expression.Constant(this));
                     }),
 
-                new FunctionCallDefinition(
+                new FunctionCallDefinition<TContext>(
                     new Grammar("FN_EACH", @"[Ee][Aa][Cc][Hh][(]"),
-                    new[] { typeof(List<decimal>), typeof(string), typeof(IAqlResolver) },
+                    new[] { typeof(List<decimal>), typeof(string), typeof(IAqlResolver<>) },
                     parameters =>
                     {
                         return Expression.Call(
                             null,
-                            Type<object>.Method(x => AqlFunctions.ApplyEach(null, null, null)),
+                            Type<object>.Method(x => AqlFunctions.ApplyEach<TContext>(null, null, null)),
                             new[] { parameters[0], parameters[1], Expression.Constant(this) });
                     }),
 
-                new FunctionCallDefinition(
+                new FunctionCallDefinition<TContext>(
                     new Grammar("FN_SIN", @"[Ss][Ii][Nn]\("),
                     new[] { typeof(double) },
                     parameters =>
@@ -208,7 +199,7 @@
                             Type<object>.Method(x => Math.Sin(0)), parameters[0]);
                     }),
 
-                new FunctionCallDefinition(
+                new FunctionCallDefinition<TContext>(
                     new Grammar("FN_COS", @"[Cc][Oo][Ss]\("),
                     new[] { typeof(double) },
                     parameters =>
@@ -218,7 +209,7 @@
                             Type<object>.Method(x => Math.Cos(0)), parameters[0]);
                     }),
 
-                new FunctionCallDefinition(
+                new FunctionCallDefinition<TContext>(
                     new Grammar("FN_TAN", @"[Tt][Aa][Nn]\("),
                     new[] { typeof(double) },
                     parameters =>
@@ -228,7 +219,7 @@
                             Type<object>.Method(x => Math.Tan(0)), parameters[0]);
                     }),
 
-                new FunctionCallDefinition(
+                new FunctionCallDefinition<TContext>(
                     new Grammar("FN_SQRT", @"[Ss][Qq][Rr][Tt]\("),
                     new[] { typeof(double) },
                     parameters =>
@@ -238,7 +229,7 @@
                             Type<object>.Method(x => Math.Sqrt(0)), parameters[0]);
                     }),
 
-                new FunctionCallDefinition(new Grammar("FN_POW", @"[Pp][Oo][Ww]\("),
+                new FunctionCallDefinition<TContext>(new Grammar("FN_POW", @"[Pp][Oo][Ww]\("),
                     new[] { typeof(double), typeof(double) },
                     parameters =>
                     {
@@ -249,82 +240,82 @@
             };
         }
 
-        private IEnumerable<GrammarDefinition> BracketDefinitions(
-            IEnumerable<FunctionCallDefinition> functionCalls)
+        private IEnumerable<GrammarDefinition<TContext>> BracketDefinitions(
+            IEnumerable<FunctionCallDefinition<TContext>> functionCalls)
         {
-            ParenthesisBracketOpenDefinition openParenthesisBracket;
-            ListDelimiterDefinition delimeter;
+            ParenthesisBracketOpenDefinition<TContext> openParenthesisBracket;
+            ListDelimiterDefinition<TContext> delimeter;
 
-            SquareBracketOpenDefinition openSquareBracket;
-            AngleBracketOpenDefinition openAngleBracket;
+            SquareBracketOpenDefinition<TContext> openSquareBracket;
+            AngleBracketOpenDefinition<TContext> openAngleBracket;
 
-            return new GrammarDefinition[]
+            return new GrammarDefinition<TContext>[]
             {
-                openParenthesisBracket = new ParenthesisBracketOpenDefinition(
+                openParenthesisBracket = new ParenthesisBracketOpenDefinition<TContext>(
                     new Grammar("OPEN_PARENTHESIS_BRACKET", @"\(")),
 
-                delimeter = new ListDelimiterDefinition(
+                delimeter = new ListDelimiterDefinition<TContext>(
                     new Grammar("COMMA", ",")),
 
-                new ParenthesisBracketCloseDefinition(
+                new ParenthesisBracketCloseDefinition<TContext>(
                     new Grammar("CLOSE_PARENTHESIS_BRACKET", @"\)"),
                     new[] { openParenthesisBracket }.Concat(functionCalls),
                     delimeter),
 
-                openSquareBracket = new SquareBracketOpenDefinition(
+                openSquareBracket = new SquareBracketOpenDefinition<TContext>(
                     new Grammar("OPEN_SQUARE_BRACKET", @"\["),
                     this),
 
-                new SquareBracketCloseDefinition(
+                new SquareBracketCloseDefinition<TContext>(
                     new Grammar("CLOSE_SQUARE_BRACKET", @"\]"),
                     new[] { openSquareBracket }, delimeter),
 
-                openAngleBracket = new AngleBracketOpenDefinition(
+                openAngleBracket = new AngleBracketOpenDefinition<TContext>(
                     new Grammar("OPEN_ANGLE_BRACKET", @"\<"),
                     this),
 
-                new AngleBracketCloseDefinition(
+                new AngleBracketCloseDefinition<TContext>(
                     new Grammar("CLOSE_ANGLE_BRACKET", @"\>"),
                     new[] { openAngleBracket })
             };
         }
 
-        private IEnumerable<GrammarDefinition> ArithmeticOperatorDefinitions()
+        private IEnumerable<GrammarDefinition<TContext>> ArithmeticOperatorDefinitions()
         {
             return new[]
             {
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("ADD", @"\+"),
                     2,
                     Expression.Add),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("SUB", @"\-"),
                     2,
                     Expression.Subtract),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("MUL", @"\*"),
                     1,
                     Expression.Multiply),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("DIV", @"\/"),
                     1,
                     Expression.Divide),
 
-                new BinaryOperatorDefinition(
+                new BinaryOperatorDefinition<TContext>(
                     new Grammar("MOD", @"%"),
                     1,
                     Expression.Modulo)
             };
         }
 
-        private IEnumerable<GrammarDefinition> PropertyDefinitions()
+        private IEnumerable<GrammarDefinition<TContext>> PropertyDefinitions()
         {
             return new[]
             {
-                new OperandDefinition(
+                new OperandDefinition<TContext>(
                     new Grammar("PROPERTY_PATH", @"(?<![0-9])([A-Za-z_][A-Za-z0-9_]*\.?)+"),
                     (value, parameters) =>
                     {
@@ -335,11 +326,11 @@
             };
         }
 
-        private IEnumerable<GrammarDefinition> WhitespaceDefinitions()
+        private IEnumerable<GrammarDefinition<TContext>> WhitespaceDefinitions()
         {
             return new[]
             {
-                new WhitespaceDefinition(new Grammar("WHITESPACE", @"\s+", true))
+                new WhitespaceDefinition<TContext>(new Grammar("WHITESPACE", @"\s+", true))
             };
         }
 

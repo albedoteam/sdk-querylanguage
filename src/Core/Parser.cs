@@ -4,38 +4,28 @@
     using System.Linq;
     using System.Linq.Expressions;
     using Exceptions;
+    using Injections;
     using States;
     using Structs;
 
-    internal class Parser
+    internal class Parser<TContext>
+        where TContext : IResolverContext
     {
-        public (Expression, Dictionary<string, Operand>) Parse(
-            IEnumerable<Token> tokens,
-            IEnumerable<ParameterExpression> parameters = null)
+        public Expression Parse(IEnumerable<Token<TContext>> tokens, IEnumerable<ParameterExpression> parameters = null)
         {
-            var operandsDictionary = new Dictionary<string, Operand>();
             parameters ??= Enumerable.Empty<ParameterExpression>();
 
-            var compileState = new ParsingState();
+            var compileState = new ParsingState<TContext>();
             compileState.Parameters.AddRange(parameters);
 
-            foreach (var token in tokens)
-            {
-                foreach (var operand in compileState.Operands.ToList())
-                    operandsDictionary.TryAdd(operand.StringSegment.ToString(), operand);
-
-                token.Definition.Apply(token, compileState);
-
-                foreach (var operand in compileState.Operands.ToList())
-                    operandsDictionary.TryAdd(operand.StringSegment.ToString(), operand);
-            }
+            foreach (var token in tokens) token.Definition.Apply(token, compileState);
 
             var outputExpression = FoldOperators(compileState);
 
-            return (outputExpression, operandsDictionary);
+            return outputExpression;
         }
 
-        private static Expression FoldOperators(ParsingState state)
+        private static Expression FoldOperators(ParsingState<TContext> state)
         {
             while (state.Operators.Count > 0)
             {

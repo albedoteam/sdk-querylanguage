@@ -3,30 +3,31 @@
     using System.Collections.Generic;
     using System.Linq.Expressions;
     using Definitions;
-    using Structs;
+    using Injections;
 
-    internal class BaseQueryLanguage
+    internal class BaseQueryLanguage<TContext>
+        where TContext : IResolverContext
     {
-        protected readonly Parser Parser;
-        protected readonly Tokenizer Tokenizer;
+        protected readonly Parser<TContext> Parser;
+        protected readonly Tokenizer<TContext> Tokenizer;
 
-        public BaseQueryLanguage(params GrammarDefinition[] grammarDefintions)
+        public BaseQueryLanguage(params GrammarDefinition<TContext>[] grammarDefintions)
         {
-            Tokenizer = new Tokenizer(grammarDefintions);
-            Parser = new Parser();
+            Tokenizer = new Tokenizer<TContext>(grammarDefintions);
+            Parser = new Parser<TContext>();
         }
 
-        public IReadOnlyList<GrammarDefinition> TokenDefinitions => Tokenizer.GrammarDefinitions;
+        public IReadOnlyList<GrammarDefinition<TContext>> TokenDefinitions => Tokenizer.GrammarDefinitions;
 
         // public (Expression, Dictionary<string, Operand>) Parse(string text, params ParameterExpression[] parameters)
         // {
         //     var tokenStream = Tokenizer.Tokenize(text);
         //     return Parser.Parse(tokenStream, parameters);
         // }
-        
-        public (Expression, Dictionary<string, Operand>) Parse(FormulaContext context, params ParameterExpression[] parameters)
+
+        public Expression Parse(ParseRequest<TContext> request, params ParameterExpression[] parameters)
         {
-            var tokenStream = Tokenizer.Tokenize(context);
+            var tokenStream = Tokenizer.Tokenize(request);
             return Parser.Parse(tokenStream, parameters);
         }
     }

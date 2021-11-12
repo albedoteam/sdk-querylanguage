@@ -9,8 +9,10 @@
     using Core.States;
     using Core.Structs;
     using Exceptions;
+    using Injections;
 
-    public class OperatorDefinition : GrammarDefinition
+    public class OperatorDefinition<TContext> : GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
         public readonly Func<Expression[], Expression> ExpressionBuilder;
         public readonly int? OrderOfPrecedence;
@@ -40,12 +42,12 @@
         }
 
 
-        public override void Apply(Token token, ParsingState state)
+        public override void Apply(Token<TContext> token, ParsingState<TContext> state)
         {
             var anyLeftOperators = ParamaterPositions.Any(x => x == RelativePosition.Left);
             while (state.Operators.Count > 0 && OrderOfPrecedence != null && anyLeftOperators)
             {
-                var prevOperator = state.Operators.Peek().Definition as OperatorDefinition;
+                var prevOperator = state.Operators.Peek().Definition as OperatorDefinition<TContext>;
                 var prevOperatorPrecedence = prevOperator?.OrderOfPrecedence;
                 if (prevOperatorPrecedence <= OrderOfPrecedence &&
                     prevOperator.ParamaterPositions.Any(x => x == RelativePosition.Right))
@@ -54,7 +56,7 @@
                     break;
             }
 
-            state.Operators.Push(new Operator(this, token.StringSegment, () =>
+            state.Operators.Push(new Operator<TContext>(this, token.StringSegment, () =>
             {
                 var rightArgs =
                     new Stack<Operand>(state.Operands.PopWhile(x => x.StringSegment.IsRightOf(token.StringSegment)));

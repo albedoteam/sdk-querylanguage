@@ -5,17 +5,22 @@
     using System.Globalization;
     using System.Linq;
     using System.Linq.Expressions;
+    using Injections;
     using Languages;
 
     public static class AqlFunctions
     {
-        public static decimal ApplyConversion(string formula, decimal value, AlbedoQueryLanguage language)
+        public static decimal ApplyConversion<TContext>(
+            string formula,
+            decimal value,
+            AlbedoQueryLanguage<TContext> language)
+            where TContext : IResolverContext
         {
             // fx(<60770b574d0bf5d86a69332c>, 3)
-            // ${input} * [60770b6a4d0bf5d86a693311]
+            // {x} * [60770b6a4d0bf5d86a693311]
 
-            formula = formula.Replace("${input}", value.ToString(CultureInfo.InvariantCulture));
-            var (innerExpression, innerDep) = Resolve(formula, language);
+            formula = formula.Replace("{x}", value.ToString(CultureInfo.InvariantCulture));
+            var innerExpression = Resolve(formula, language);
 
             var le = Expression.Lambda<Func<decimal>>(innerExpression);
             var compiledExpression = le.Compile();
@@ -23,8 +28,12 @@
             return result;
         }
 
-        public static decimal ApplyIf(bool condition, decimal trueValue, decimal falseValue,
-            AlbedoQueryLanguage language)
+        public static decimal ApplyIf<TContext>(
+            bool condition,
+            decimal trueValue,
+            decimal falseValue,
+            AlbedoQueryLanguage<TContext> language)
+            where TContext : IResolverContext
         {
             // if((1 gt 2) and (2 gt 3), 1, 2)
             // if(1 gt 2, 1, 2)
@@ -33,7 +42,11 @@
             return condition ? trueValue : falseValue;
         }
 
-        public static decimal ApplyEach(IEnumerable<decimal> inputValues, string formula, AlbedoQueryLanguage language)
+        public static decimal ApplyEach<TContext>(
+            IEnumerable<decimal> inputValues,
+            string formula,
+            AlbedoQueryLanguage<TContext> language)
+            where TContext : IResolverContext
         {
             // each([inputId], fx(<[formulaId]>, inputValue))
 
@@ -45,12 +58,20 @@
             return results.Sum();
         }
 
-        private static (ConstantExpression, InnerDep) Resolve(string formula, AlbedoQueryLanguage language)
+        private static ConstantExpression Resolve<TContext>(
+            string formula,
+            AlbedoQueryLanguage<TContext> language)
+            where TContext : IResolverContext
         {
-            var aqlFormula = language.Parse(formula);
-            var innerExpressionResult = Expression.Constant(aqlFormula.Result);
+            var parseResponse = language.Parse(new ParseRequest<TContext>
+            {
+                Context = language.Context,
+                Formula = formula
+            });
 
-            return (innerExpressionResult, new InnerDep(aqlFormula, null));
+            var innerExpressionResult = Expression.Constant(parseResponse.Result);
+
+            return innerExpressionResult;
         }
     }
 }

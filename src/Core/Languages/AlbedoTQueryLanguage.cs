@@ -1,6 +1,9 @@
 ﻿namespace AlbedoTeam.Sdk.QueryLanguage.Core.Languages
 {
-    internal class AlbedoTQueryLanguage : BaseQueryLanguage
+    using Injections;
+
+    internal class AlbedoTQueryLanguage<TContext> : BaseQueryLanguage<TContext>
+        where TContext : IResolverContext
     {
         // private readonly BaseQueryLanguage _language;
         //

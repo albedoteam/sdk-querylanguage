@@ -5,8 +5,10 @@
     using Core.Enumerators;
     using Core.Structs;
     using Core.Utility;
+    using Injections;
 
-    public class BinaryOperatorDefinition : OperatorDefinition
+    public class BinaryOperatorDefinition<TContext> : OperatorDefinition<TContext>
+        where TContext : IResolverContext
     {
         private static readonly RelativePosition[] LeftRight = { RelativePosition.Left, RelativePosition.Right };
 
