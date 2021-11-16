@@ -3,38 +3,32 @@
     using System.Collections.Generic;
     using System.Linq.Expressions;
     using Definitions;
-    using Structs;
+    using Injections;
 
-    internal class BaseQueryLanguage
+    internal class BaseQueryLanguage<TContext>
+        where TContext : IResolverContext
     {
-        protected readonly Parser Parser;
-        protected readonly Tokenizer Tokenizer;
+        protected readonly Parser<TContext> Parser;
+        protected readonly Tokenizer<TContext> Tokenizer;
 
-        public BaseQueryLanguage(params GrammarDefinition[] grammarDefintions)
+        public BaseQueryLanguage(params GrammarDefinition<TContext>[] grammarDefintions)
         {
-            Tokenizer = new Tokenizer(grammarDefintions);
-            Parser = new Parser();
+            Tokenizer = new Tokenizer<TContext>(grammarDefintions);
+            Parser = new Parser<TContext>();
         }
 
-        public IReadOnlyList<GrammarDefinition> TokenDefinitions => Tokenizer.GrammarDefinitions;
+        public IReadOnlyList<GrammarDefinition<TContext>> TokenDefinitions => Tokenizer.GrammarDefinitions;
 
-        public (Expression, Dictionary<string, Operand>) Parse(string text, params ParameterExpression[] parameters)
+        // public (Expression, Dictionary<string, Operand>) Parse(string text, params ParameterExpression[] parameters)
+        // {
+        //     var tokenStream = Tokenizer.Tokenize(text);
+        //     return Parser.Parse(tokenStream, parameters);
+        // }
+
+        public Expression Parse(ParseRequest<TContext> request, params ParameterExpression[] parameters)
         {
-            var tokenStream = Tokenizer.Tokenize(text);
+            var tokenStream = Tokenizer.Tokenize(request);
             return Parser.Parse(tokenStream, parameters);
         }
-
-        // public Expression<Func<TOut>> Parse<TOut>(string text)
-        // {
-        //     var body = Parse(text);
-        //     return Expression.Lambda<Func<TOut>>(body);
-        // }
-        //
-        // public Expression<Func<TIn, TOut>> Parse<TIn, TOut>(string text)
-        // {
-        //     var parameters = new[] {Expression.Parameter(typeof(TIn))};
-        //     var body = Parse(text, parameters);
-        //     return Expression.Lambda<Func<TIn, TOut>>(body, parameters);
-        // }
     }
 }

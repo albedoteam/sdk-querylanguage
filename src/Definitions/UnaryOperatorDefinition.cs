@@ -4,12 +4,14 @@
     using System.Linq.Expressions;
     using Core.Enumerators;
     using Core.Structs;
+    using Injections;
 
     /// <summary>
     ///     Represents an operator that takes a single operand
     /// </summary>
     /// <seealso cref="OperatorDefinition" />
-    internal class UnaryOperatorDefinition : OperatorDefinition
+    internal class UnaryOperatorDefinition<TContext> : OperatorDefinition<TContext>
+        where TContext : IResolverContext
     {
         /// <summary>
         ///     Initializes a new instance of the <see cref="UnaryOperatorDefinition" /> class.

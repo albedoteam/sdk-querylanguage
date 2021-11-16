@@ -1,8 +1,11 @@
 namespace AlbedoTeam.Sdk.QueryLanguage.Injections
 {
-    public class ResolverRequest
+    public class ResolverRequest<TContext> : IResolverRequest<TContext>
+        where TContext : IResolverContext
     {
-        public InputType InputType { get; set; }
-        public string InputId { get; set; }
+        public TContext Context { get; set; }
+        public ReferenceType ReferenceType { get; set; }
+        public string ReferenceId { get; set; }
+        public IResolverResponse<TContext> PreviousResponse { get; set; }
     }
 }

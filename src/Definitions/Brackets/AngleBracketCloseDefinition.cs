@@ -6,14 +6,16 @@
     using Core.States;
     using Core.Structs;
     using Exceptions;
+    using Injections;
 
-    public class AngleBracketCloseDefinition : GrammarDefinition
+    public class AngleBracketCloseDefinition<TContext> : GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
-        public readonly IReadOnlyCollection<AngleBracketOpenDefinition> BracketOpenDefinitions;
+        public readonly IReadOnlyCollection<AngleBracketOpenDefinition<TContext>> BracketOpenDefinitions;
 
         public AngleBracketCloseDefinition(
             Grammar grammar,
-            IEnumerable<AngleBracketOpenDefinition> bracketOpenDefinitions)
+            IEnumerable<AngleBracketOpenDefinition<TContext>> bracketOpenDefinitions)
             : base(grammar)
         {
             if (bracketOpenDefinitions == null)
@@ -22,7 +24,7 @@
             BracketOpenDefinitions = bracketOpenDefinitions.ToList();
         }
 
-        public override void Apply(Token token, ParsingState state)
+        public override void Apply(Token<TContext> token, ParsingState<TContext> state)
         {
             var bracketOperands = new Stack<Operand>();
             var previousSeperator = token.StringSegment;
@@ -38,9 +40,9 @@
                     if (operand != null && operand.Value.StringSegment.IsBetween(firstSegment, previousSeperator))
                         bracketOperands.Push(state.Operands.Pop());
 
-                    var closeBracketOperator = new Operator(this, token.StringSegment, () => { });
+                    var closeBracketOperator = new Operator<TContext>(this, token.StringSegment, () => { });
 
-                    ((AngleBracketOpenDefinition)currentOperator.Definition).ApplyBracketOperands(
+                    ((AngleBracketOpenDefinition<TContext>)currentOperator.Definition).ApplyBracketOperands(
                         currentOperator,
                         bracketOperands,
                         closeBracketOperator,

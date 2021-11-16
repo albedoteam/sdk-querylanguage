@@ -10,28 +10,30 @@
     using Exceptions;
     using Injections;
 
-    public class SquareBracketOpenDefinition : GrammarDefinition
+    public class SquareBracketOpenDefinition<TContext> : GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
-        private readonly AlbedoQueryLanguage _language;
+        private readonly AlbedoQueryLanguage<TContext> _language;
 
-        public SquareBracketOpenDefinition(Grammar grammar, AlbedoQueryLanguage language) : base(grammar)
+        public SquareBracketOpenDefinition(Grammar grammar, AlbedoQueryLanguage<TContext> language) : base(grammar)
         {
             _language = language;
         }
 
-        public override void Apply(Token token, ParsingState state)
+        public override void Apply(Token<TContext> token, ParsingState<TContext> state)
         {
-            state.Operators.Push(new Operator(
+            state.Request = token.Request;
+            state.Operators.Push(new Operator<TContext>(
                 this,
                 token.StringSegment,
                 () => throw new BracketUnmatchedException(token.StringSegment)));
         }
 
         public virtual void ApplyBracketOperands(
-            Operator bracketOpen,
+            Operator<TContext> bracketOpen,
             Stack<Operand> bracketOperands,
-            Operator bracketClose,
-            ParsingState state)
+            Operator<TContext> bracketClose,
+            ParsingState<TContext> state)
         {
             if (bracketOperands.Count == 0)
             {
@@ -48,7 +50,7 @@
             if (bracketOperands.Count == 2)
             {
                 // table reference
-                var (expression, innerDep) = ResolveCell(bracketOperands);
+                var expression = ResolveCell(bracketOperands, state.Request);
 
                 var bracketOperand = bracketOperands.Pop();
 
@@ -57,52 +59,69 @@
                     bracketOperand.StringSegment,
                     bracketClose.StringSegment);
 
-                state.Operands.Push(new Operand(expression, sourceMap, innerDep));
+                state.Operands.Push(new Operand(expression, sourceMap));
             }
             else
             {
                 var bracketOperand = bracketOperands.Pop();
-                var (expression, innerDep) = Resolve(bracketOperand);
+                var expression = Resolve(bracketOperand, state.Request);
 
                 var sourceMap = StringSegment.Encompass(
                     bracketOpen.StringSegment,
                     bracketOperand.StringSegment,
                     bracketClose.StringSegment);
 
-                state.Operands.Push(new Operand(expression, sourceMap, innerDep));
+                state.Operands.Push(new Operand(expression, sourceMap));
             }
         }
 
-        private (ConstantExpression, InnerDep) Resolve(Operand bracketOperand)
+        private ConstantExpression Resolve(Operand bracketOperand, ParseRequest<TContext> request)
         {
             var le = Expression.Lambda<Func<string>>(bracketOperand.Expression);
             var compiledExpression = le.Compile();
             var idToBeResolved = compiledExpression();
 
-            var response = _language.Resolver.ReferenceResolver(new ResolverRequest
+            var resolverResponse = _language.Resolver.ReferenceResolver(_language, new ResolverRequest<TContext>
             {
-                InputId = idToBeResolved,
-                InputType = InputType.Resolver
+                Context = request.Context,
+                ReferenceId = idToBeResolved,
+                ReferenceType = ReferenceType.DataInput,
+                PreviousResponse = request.PreviousResponse
             }).Result;
 
-            if (response.Values.Count == 1 && !response.AllowsMultipleValues)
+            if (resolverResponse.ResolverResults is { } && resolverResponse.ResolverResults.Count > 0)
             {
-                var aqlFormula = _language.Parse(response.Values[0]);
-                var innerExpressionResult = Expression.Constant(aqlFormula.Result);
+                if (resolverResponse.ResolverResults.Count == 1 && !resolverResponse.ReferenceAllowsMultipleValues)
+                {
+                    var parseResponse = _language.Parse(new ParseRequest<TContext>
+                    {
+                        Context = request.Context,
+                        Formula = resolverResponse.ResolverResults[0].Value,
+                        PreviousResponse = resolverResponse
+                    });
 
-                return (innerExpressionResult, new InnerDep(aqlFormula, response));
+                    var innerExpressionResult = Expression.Constant(parseResponse.Result);
+                    return innerExpressionResult;
+                }
+
+                var listValues = resolverResponse.ResolverResults
+                    .Select(result => _language.Parse(new ParseRequest<TContext>
+                    {
+                        Context = request.Context,
+                        Formula = result.Value
+                    }))
+                    .Select(aqlFormula => aqlFormula.Result)
+                    .ToList();
+
+                var innerListResult = Expression.Constant(listValues);
+                return innerListResult;
             }
 
-            var listValues = response.Values
-                .Select(value => _language.Parse(value))
-                .Select(aqlFormula => aqlFormula.Result)
-                .ToList();
-
-            var innerListResult = Expression.Constant(listValues);
-            return (innerListResult, null);
+            var innerEmptyResult = Expression.Constant(0);
+            return innerEmptyResult;
         }
 
-        private (ConstantExpression, InnerDep) ResolveCell(Stack<Operand> brackets)
+        private ConstantExpression ResolveCell(Stack<Operand> brackets, ParseRequest<TContext> request)
         {
             var idToBeResolved = new List<string>();
             foreach (var bracket in brackets)
@@ -115,27 +134,43 @@
 
             var idsToResolve = string.Join(",", idToBeResolved);
 
-            var response = _language.Resolver.ReferenceResolver(new ResolverRequest
+            var resolverResponse = _language.Resolver.ReferenceResolver(_language, new ResolverRequest<TContext>
             {
-                InputId = idsToResolve,
-                InputType = InputType.TableResolver
+                Context = request.Context,
+                ReferenceId = idsToResolve,
+                ReferenceType = ReferenceType.TableCell
             }).Result;
 
-            if (response.Values.Count == 1 && !response.AllowsMultipleValues)
+            if (resolverResponse.ResolverResults is { } || resolverResponse.ResolverResults.Count > 0)
             {
-                var aqlFormula = _language.Parse(response.Values[0]);
-                var innerExpressionResult = Expression.Constant(aqlFormula.Result);
+                if (resolverResponse.ResolverResults.Count == 1 && !resolverResponse.ReferenceAllowsMultipleValues)
+                {
+                    var parseResponse = _language.Parse(new ParseRequest<TContext>
+                    {
+                        Context = request.Context,
+                        Formula = resolverResponse.ResolverResults[0].Value
+                    });
 
-                return (innerExpressionResult, new InnerDep(aqlFormula, response));
+                    var innerExpressionResult = Expression.Constant(parseResponse.Result);
+
+                    return innerExpressionResult;
+                }
+
+                var listValues = resolverResponse.ResolverResults
+                    .Select(result => _language.Parse(new ParseRequest<TContext>
+                    {
+                        Context = request.Context,
+                        Formula = result.Value
+                    }))
+                    .Select(aqlFormula => aqlFormula.Result)
+                    .ToList();
+
+                var innerListResult = Expression.Constant(listValues);
+                return innerListResult;
             }
 
-            var listValues = response.Values
-                .Select(value => _language.Parse(value))
-                .Select(aqlFormula => aqlFormula.Result)
-                .ToList();
-
-            var innerListResult = Expression.Constant(listValues);
-            return (innerListResult, null);
+            var innerEmptyResult = Expression.Constant(0);
+            return innerEmptyResult;
         }
     }
 }

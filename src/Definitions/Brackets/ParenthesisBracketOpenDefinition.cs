@@ -5,26 +5,28 @@
     using Core.States;
     using Core.Structs;
     using Exceptions;
+    using Injections;
 
-    public class ParenthesisBracketOpenDefinition : GrammarDefinition
+    public class ParenthesisBracketOpenDefinition<TContext> : GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
         public ParenthesisBracketOpenDefinition(Grammar grammar) : base(grammar)
         {
         }
 
-        public override void Apply(Token token, ParsingState state)
+        public override void Apply(Token<TContext> token, ParsingState<TContext> state)
         {
-            state.Operators.Push(new Operator(
+            state.Operators.Push(new Operator<TContext>(
                 this,
                 token.StringSegment,
                 () => throw new BracketUnmatchedException(token.StringSegment)));
         }
 
         public virtual void ApplyBracketOperands(
-            Operator bracketOpen,
+            Operator<TContext> bracketOpen,
             Stack<Operand> bracketOperands,
-            Operator bracketClose,
-            ParsingState state)
+            Operator<TContext> bracketClose,
+            ParsingState<TContext> state)
         {
             if (bracketOperands.Count == 0)
             {

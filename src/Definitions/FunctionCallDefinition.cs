@@ -11,7 +11,8 @@
     using Exceptions;
     using Injections;
 
-    public class FunctionCallDefinition : ParenthesisBracketOpenDefinition
+    public class FunctionCallDefinition<TContext> : ParenthesisBracketOpenDefinition<TContext>
+        where TContext : IResolverContext
     {
         public readonly IReadOnlyList<Type> ArgumentTypes;
         public readonly Func<Expression[], Expression> ExpressionBuilder;
@@ -32,9 +33,9 @@
         }
 
         public override void ApplyBracketOperands(
-            Operator bracketOpen,
+            Operator<TContext> bracketOpen,
             Stack<Operand> bracketOperands,
-            Operator bracketClose, ParsingState state)
+            Operator<TContext> bracketClose, ParsingState<TContext> state)
         {
             var operandSource = StringSegment.Encompass(bracketOperands.Select(x => x.StringSegment));
             var functionArguments = bracketOperands.Select(x => x.Expression);
@@ -42,7 +43,7 @@
             if (ArgumentTypes != null)
             {
                 var argCount = ArgumentTypes.Count;
-                if (ArgumentTypes.Contains(typeof(IAqlResolver)))
+                if (ArgumentTypes.Contains(typeof(IAqlResolver<>)))
                     argCount--;
 
                 var expectedArgumentCount = argCount;

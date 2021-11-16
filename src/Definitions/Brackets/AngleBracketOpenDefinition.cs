@@ -10,28 +10,30 @@
     using Exceptions;
     using Injections;
 
-    public class AngleBracketOpenDefinition : GrammarDefinition
+    public class AngleBracketOpenDefinition<TContext> : GrammarDefinition<TContext>
+        where TContext : IResolverContext
     {
-        private readonly AlbedoQueryLanguage _language;
+        private readonly AlbedoQueryLanguage<TContext> _language;
 
-        public AngleBracketOpenDefinition(Grammar grammar, AlbedoQueryLanguage language) : base(grammar)
+        public AngleBracketOpenDefinition(Grammar grammar, AlbedoQueryLanguage<TContext> language) : base(grammar)
         {
             _language = language;
         }
 
-        public override void Apply(Token token, ParsingState state)
+        public override void Apply(Token<TContext> token, ParsingState<TContext> state)
         {
-            state.Operators.Push(new Operator(
+            state.Request = token.Request;
+            state.Operators.Push(new Operator<TContext>(
                 this,
                 token.StringSegment,
                 () => throw new BracketUnmatchedException(token.StringSegment)));
         }
 
         public virtual void ApplyBracketOperands(
-            Operator bracketOpen,
+            Operator<TContext> bracketOpen,
             Stack<Operand> bracketOperands,
-            Operator bracketClose,
-            ParsingState state)
+            Operator<TContext> bracketClose,
+            ParsingState<TContext> state)
         {
             if (bracketOperands.Count == 0)
             {
@@ -46,33 +48,36 @@
             }
 
             var bracketOperand = bracketOperands.Pop();
-            var (expression, innerDep) = Resolve(bracketOpen, bracketOperand, bracketClose);
+            var expression = Resolve(bracketOpen, bracketOperand, bracketClose, state.Request);
 
             var sourceMap = StringSegment.Encompass(
                 bracketOpen.StringSegment,
                 bracketOperand.StringSegment,
                 bracketClose.StringSegment);
 
-            state.Operands.Push(new Operand(expression, sourceMap, innerDep));
+            state.Operands.Push(new Operand(expression, sourceMap));
         }
 
-        private (ConstantExpression, InnerDep) Resolve(
-            Operator bracketOpen,
+        private ConstantExpression Resolve(
+            Operator<TContext> bracketOpen,
             Operand bracketOperand,
-            Operator bracketClose)
+            Operator<TContext> bracketClose,
+            ParseRequest<TContext> request)
         {
             var le = Expression.Lambda<Func<string>>(bracketOperand.Expression);
             var compiledExpression = le.Compile();
             var idToBeResolved = compiledExpression();
 
-            var response = _language.Resolver.ReferenceResolver(new ResolverRequest
+            var response = _language.Resolver.ReferenceResolver(_language, new ResolverRequest<TContext>
             {
-                InputId = idToBeResolved,
-                InputType = InputType.Function
+                Context = request.Context,
+                ReferenceId = idToBeResolved,
+                ReferenceType = ReferenceType.Function
             }).Result;
 
-            if (response.Values[0].Contains("${"))
-                return (Expression.Constant(response.Values[0]), new InnerDep(null, response));
+            if (response.ResolverResults is { } && response.ResolverResults.Count > 0)
+                if (response.ResolverResults[0].Value.Contains("${"))
+                    return Expression.Constant(response.ResolverResults[0].Value);
 
             var insideBrackets = StringSegment.Between(bracketOpen.StringSegment, bracketClose.StringSegment);
             throw new OperandExpectedException(insideBrackets);
